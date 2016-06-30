@@ -1,0 +1,72 @@
+node{
+    deleteDir()
+    stage 'Build components'
+    def engineType = 'WarpEngine'
+
+    def components =    ["Warp-coils"     : {component1 = build 'Warp-coils'},
+                         "Intercooler"    : {component2 = build 'Intercooler'},
+                         "Power-unit"     : {component3 = build 'Power-unit'},
+                         "Field-impeller" : {component4 = build 'Field-impeller'}]
+
+    parallel components
+
+    stage 'Resolve components'
+    resolve('Warp-coils',     component1)
+    resolve('Intercooler',    component2)
+    resolve('Power-unit',     component3)
+    resolve('Field-impeller', component4)
+
+    stage 'Create engine'
+    createEngine(engineType)
+
+    stage 'Deploy engine'
+    deployEngine(engineType)
+
+    stage 'Send to production'
+    sendToProduction()
+}
+
+def resolve(buildName, build){
+    def props= build.buildVariables['BUILD_PROPS']
+    def downloadSpec = """{
+        "files": [{
+            "pattern": "engine-virtual-repo/*",
+            "target": "Engine/${buildName}/",
+            "props": "${props}",
+            "recursive":"true",
+            "flat":"true"
+        }]
+    }
+    """
+
+    Artifactory.server('A1').download(downloadSpec)
+}
+
+def createEngine(engineType){
+    zip dir: 'Engine', glob: '', zipFile: engineType+'.zip'
+}
+
+def deployEngine(engineType){
+    def uploadSpec = """{
+        "files": [{
+            "pattern": "${engineType}*",
+            "target": "libs-snapshot-local/Engine/${engineType}/${env.BUILD_ID}/"
+        }]
+    }
+    """
+
+    def server = Artifactory.server('A1')
+    def buildInfo = server.upload(uploadSpec)
+    server.publishBuildInfo(buildInfo)
+}
+
+def sendToProduction(){
+    def server = Artifactory.server('A1')
+    def pCfg = Artifactory.newPromotionConfig(env.JOB_NAME, env.BUILD_ID, "libs-release-local")
+
+    pCfg.comment = "Send engine to production"
+    pCfg.targetStatus = "Released"
+    pCfg.useCopy = true
+
+    server.promote(pCfg)
+}
