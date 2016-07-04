@@ -18,7 +18,7 @@ node {
     resolve('field-impeller', component4, buildInfo)
 
     stage 'Create engine'
-    createEngine(engineType)
+    createEngine(engineType, buildInfo)
 
     stage 'Test engine'
     testEngine()
@@ -46,8 +46,15 @@ def resolve(buildName, build, buildInfo) {
     Artifactory.server('A1').download(downloadSpec, buildInfo)
 }
 
-def createEngine(engineType) {
-    zip dir: 'Engine', glob: '', zipFile: engineType + '.zip'
+def createEngine(engineType, buildInfo) {
+    withEnv(["ENGINE_TYPE=${engineType}"]) {
+        //Add include and collect env vars.
+        buildInfo.env.filter.addInclude("ENGINE_TYPE")
+        buildInfo.env.collect()
+
+        //Create Warp engine
+        zip dir: 'Engine', glob: '', zipFile: engineType + '.zip'
+    }
 }
 
 def testEngine() {
