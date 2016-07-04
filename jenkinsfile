@@ -53,7 +53,7 @@ def createEngine(engineType, buildInfo) {
         buildInfo.env.collect()
 
         //Create Warp engine
-        zip dir: 'Engine', glob: '', zipFile: engineType + '.zip'
+        zip dir: 'Engine', glob: '', zipFile: env.ENGINE_TYPE + '.zip'
     }
 }
 
